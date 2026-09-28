@@ -4,19 +4,50 @@ A small Ruby frontend for the [Hegel](https://hegel.dev/) property-based testing
 
 This is an early Linux x86-64 implementation pinned to `libhegel` 0.44.0. It currently supports bounded integers, arrays, the core runner, verified failure replay, and Minitest assertions.
 
-## Try the developer experience
+## Set up a clean checkout
+
+After cloning the repository, enter its root directory. The supported development environment is Linux x86-64 with Ruby **3.4.10**, pinned in `.ruby-version`. Install Git, Bash, curl, `sha256sum`, and a C compiler/build tools for the `ffi` gem; a Ruby source installation may also require your Ruby manager's build prerequisites.
+
+With Mise, enable `.ruby-version` support once, then install the project's Ruby:
 
 ```sh
-ruby "$(ruby -e 'print Gem.user_dir')/bin/bundle" install
+mise settings add idiomatic_version_file_enable_tools ruby
+mise install
+ruby -v # Should report 3.4.10
+```
+
+Other Ruby managers that honor `.ruby-version` work too. With the correct Ruby active:
+
+```sh
+bundle install
 ./script/fetch-libhegel
 ./script/test
+```
+
+If `bundle` is unavailable, install Bundler for the active Ruby with `gem install bundler`. The fetch script explicitly downloads the pinned engine and matching header into `vendor/` and verifies their checksums. Tests never download native files automatically.
+
+## Run tests and examples
+
+From the repository root:
+
+```sh
+# Run the core test suite (excludes the deliberately failing examples)
+./script/test
+
+# Run one test file, optionally passing Minitest arguments
+./script/test test/runner_test.rb
+./script/test test/runner_test.rb --seed 1234
 
 # Intentionally fails and shrinks the input to [0, 0]
-ruby "$(ruby -e 'print Gem.user_dir')/bin/bundle" exec ruby -Ilib examples/minitest/broken_sort_test.rb
+./script/test examples/minitest/broken_sort_test.rb
 
 # The corrected implementation passes
-ruby "$(ruby -e 'print Gem.user_dir')/bin/bundle" exec ruby -Ilib examples/minitest/fixed_sort_test.rb
+./script/test examples/minitest/fixed_sort_test.rb
 ```
+
+`script/test` loads the bundle and local library code for you. It accepts one Ruby test file followed by optional Minitest arguments and preserves the test process's exit status. The broken examples should exit with status 1 and show an assertion failure, not a setup error.
+
+## Try the developer experience
 
 The property looks like ordinary Minitest:
 
@@ -49,8 +80,7 @@ The interval example models a scheduling system that consolidates overlapping bu
 First run the deliberately broken implementation:
 
 ```sh
-ruby "$(ruby -e 'print Gem.user_dir')/bin/bundle" exec \
-  ruby -Ilib examples/minitest/broken_interval_merger_test.rb
+./script/test examples/minitest/broken_interval_merger_test.rb
 ```
 
 Hegel finds that shortening an existing period to the end of a nested period loses occupied time, then shrinks the input to:
@@ -65,8 +95,7 @@ Expected: [0, 1]
 The integers are paired and normalized into nonempty half-open intervals. Run the corrected implementation with:
 
 ```sh
-ruby "$(ruby -e 'print Gem.user_dir')/bin/bundle" exec \
-  ruby -Ilib examples/minitest/interval_merger_test.rb
+./script/test examples/minitest/interval_merger_test.rb
 ```
 
 Read [`examples/minitest/broken_interval_merger_test.rb`](examples/minitest/broken_interval_merger_test.rb) for the property, then compare [`examples/broken_interval_merger.rb`](examples/broken_interval_merger.rb) with [`examples/interval_merger.rb`](examples/interval_merger.rb) to see the one-line correction.
