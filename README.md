@@ -167,7 +167,7 @@ Read these files in order:
 6. [`lib/hegel/native.rb`](lib/hegel/native.rb) — the pinned C ABI surface.
 7. [`test/`](test) — lifecycle, replay, generator, and Minitest integration behavior.
 
-For the feasibility evidence behind this implementation, see [`docs/ruby-spike-findings.md`](docs/ruby-spike-findings.md). Architectural background is in [`docs/hegel-research.md`](docs/hegel-research.md). The superseded throwaway code and execution plan remain available in Git history.
+For the feasibility evidence behind this implementation, see [`docs/ruby-spike-findings.md`](docs/ruby-spike-findings.md). Architectural background is in [`docs/hegel-research.md`](docs/hegel-research.md). The [`upstream compatibility policy`](docs/upstream-compatibility.md) defines how public API, behavior, native ABI, and platform decisions are checked against Hegel. The superseded throwaway code and execution plan remain available in Git history.
 
 ## Current scope
 
