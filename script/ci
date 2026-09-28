@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+./script/fetch-libhegel
+./script/test
+./script/test examples/minitest/fixed_sort_test.rb
+./script/test examples/minitest/interval_merger_test.rb
+
+failure_output="$(mktemp)"
+cleanup() { rm -f "$failure_output"; }
+trap cleanup EXIT
+
+if ./script/test examples/minitest/broken_interval_merger_test.rb >"$failure_output" 2>&1; then
+  cat "$failure_output"
+  echo "Expected the broken interval example to fail" >&2
+  exit 1
+fi
+
+cat "$failure_output"
+grep --fixed-strings --quiet "Hegel shrank a failing example" "$failure_output"
+grep --fixed-strings --quiet "1 failures, 0 errors" "$failure_output"

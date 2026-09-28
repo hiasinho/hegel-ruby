@@ -1,5 +1,7 @@
 # Hegel for Ruby
 
+[![CI](https://github.com/hiasinho/hegel-ruby/actions/workflows/ci.yml/badge.svg)](https://github.com/hiasinho/hegel-ruby/actions/workflows/ci.yml)
+
 A small Ruby frontend for the [Hegel](https://hegel.dev/) property-based testing engine. Ruby runs your test and builds Ruby values; `libhegel` chooses examples, searches, shrinks failures, and creates replay blobs.
 
 This is an early Linux x86-64 implementation pinned to `libhegel` 0.44.0. It currently supports bounded integers, arrays, the core runner, verified failure replay, and Minitest assertions.
@@ -46,6 +48,16 @@ From the repository root:
 ```
 
 `script/test` loads the bundle and local library code for you. It accepts one Ruby test file followed by optional Minitest arguments and preserves the test process's exit status. The broken examples should exit with status 1 and show an assertion failure, not a setup error.
+
+## Continuous integration
+
+GitHub Actions runs [`script/ci`](script/ci) on every push and pull request. A fresh Linux runner installs Ruby and the locked bundle, downloads and verifies the pinned `libhegel`, runs the core suite and passing examples, and confirms that the deliberately broken interval example fails through Hegel shrinking rather than a setup error.
+
+Run the same checks locally with:
+
+```sh
+./script/ci
+```
 
 ## Try the developer experience
 
