@@ -51,6 +51,7 @@ module Hegel
       @failure_exceptions = normalize_exception_classes(:failure_exceptions, failure_exceptions)
       @propagate_exceptions = normalize_exception_classes(:propagate_exceptions, propagate_exceptions)
       @native = native
+      @used = false
       @context = @native.hegel_context_new
       if !@context || @context.null?
         raise Native::Error, "hegel_context_new returned a null handle"
@@ -61,6 +62,7 @@ module Hegel
     end
 
     def check(&property)
+      claimed = claim!
       raise ArgumentError, "a property block is required" unless property
 
       verify_version!
@@ -80,10 +82,11 @@ module Hegel
         raise Native::Error, "property run returned an unknown status"
       end
     ensure
-      cleanup
+      cleanup if claimed
     end
 
     def replay(blob:, expected_origin:, &property)
+      claimed = claim!
       raise ArgumentError, "blob must be a non-empty String" unless blob.is_a?(String) && !blob.empty?
       raise ArgumentError, "expected_origin must be a non-empty String" unless expected_origin.is_a?(String) && !expected_origin.empty?
       raise ArgumentError, "a property block is required" unless property
@@ -92,10 +95,16 @@ module Hegel
       settings = build_settings
       replay_failure(settings, { blob:, origin: expected_origin }, &property)
     ensure
-      cleanup
+      cleanup if claimed
     end
 
     private
+      def claim!
+        raise Error, "runner instances can only be used once" if @used
+
+        @used = true
+      end
+
       def validate_max_examples(value)
         unless value.is_a?(Integer) && value.positive?
           raise ArgumentError, "max_examples must be a positive Integer"

@@ -58,4 +58,19 @@ class LifecycleTest < Minitest::Test
     assert_equal native.calls[:hegel_new_collection], native.calls[:hegel_collection_free]
     assert_equal native.calls[:hegel_start_span], native.calls[:hegel_stop_span]
   end
+
+  def test_reentrant_runner_use_does_not_free_the_outer_run_twice
+    native = NativeRecorder.new
+    runner = Hegel::Runner.new(max_examples: 1, seed: 1234, native:)
+
+    error = assert_raises(Hegel::Error) do
+      runner.check { runner.check {} }
+    end
+
+    assert_equal "runner instances can only be used once", error.message
+    assert_equal 1, native.calls[:hegel_test_case_free]
+    assert_equal 1, native.calls[:hegel_run_free]
+    assert_equal 1, native.calls[:hegel_settings_free]
+    assert_equal 1, native.calls[:hegel_context_free]
+  end
 end

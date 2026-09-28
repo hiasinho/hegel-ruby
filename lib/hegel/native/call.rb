@@ -32,7 +32,7 @@ module Hegel
         output = FFI::MemoryPointer.new(:pointer)
         call(operation, *arguments, output)
         pointer = output.read_pointer
-        pointer.null? ? nil : pointer.read_string.dup
+        pointer.null? ? nil : pointer.read_string.dup.force_encoding(Encoding::UTF_8)
       end
 
       def non_null(pointer, operation)

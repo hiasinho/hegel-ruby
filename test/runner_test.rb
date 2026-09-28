@@ -70,6 +70,14 @@ class RunnerTest < Minitest::Test
     end
   end
 
+  def test_runner_instances_are_single_use
+    runner = Hegel::Runner.new(max_examples: 1, seed: 1234)
+
+    assert runner.check {}.passed?
+    error = assert_raises(Hegel::Error) { runner.check {} }
+    assert_equal "runner instances can only be used once", error.message
+  end
+
   def test_does_not_classify_frontend_errors_as_property_failures
     error = Hegel::ReproductionMismatch.new("stale blob")
 
@@ -91,6 +99,26 @@ class RunnerTest < Minitest::Test
     assert_raises(Hegel::ClosedTestCase) do
       retained_test_case.draw(Hegel.integers(min: 0, max: 0))
     end
+  end
+
+  def test_failure_reports_preserve_nested_draws_when_the_property_mutates_them
+    integers = Hegel.integers(min: 0, max: 0)
+    inner_arrays = Hegel.arrays(integers, min_size: 1, max_size: 1)
+    nested_arrays = Hegel.arrays(inner_arrays, min_size: 1, max_size: 1)
+    report = nil
+
+    assert_raises(RuntimeError) do
+      Hegel.check(max_examples: 1, seed: 1234, on_failure: ->(failure) { report = failure }) do |test_case|
+        values = test_case.draw(nested_arrays)
+        values.first.clear
+        raise "mutated after drawing"
+      end
+    end
+
+    assert_equal [ [ [ 0 ] ] ], report.drawn_values
+    assert report.drawn_values.frozen?
+    assert report.drawn_values.first.frozen?
+    assert report.drawn_values.first.first.frozen?
   end
 
   def test_validates_generator_bounds

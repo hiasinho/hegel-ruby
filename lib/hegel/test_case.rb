@@ -96,7 +96,7 @@ module Hegel
       end
 
       def copy_value(value)
-        value.is_a?(Array) ? value.dup.freeze : value
+        value.is_a?(Array) ? value.map { |element| copy_value(element) }.freeze : value
       end
   end
 end

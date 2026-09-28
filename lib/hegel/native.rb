@@ -21,7 +21,7 @@ module Hegel
     HEGEL_STATUS_INTERESTING = 3
 
     class Error < StandardError; end
-    class StopTest < StandardError; end
+    class StopTest < Exception; end
 
     extend FFI::Library
 
