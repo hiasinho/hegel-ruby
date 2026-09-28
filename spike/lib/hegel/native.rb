@@ -11,7 +11,9 @@ module Hegel
     HEGEL_OK = 0
     HEGEL_E_STOP_TEST = -1
 
+    HEGEL_RUN_STATUS_PASSED = 0
     HEGEL_RUN_STATUS_FAILED = 1
+    HEGEL_RUN_STATUS_ERROR = 2
 
     HEGEL_STATUS_VALID = 0
     HEGEL_STATUS_OVERRUN = 2
@@ -52,8 +54,17 @@ module Hegel
     attach_function :hegel_generate_integer, [:pointer, :pointer, :int64, :int64, :pointer], :int
     attach_function :hegel_mark_complete, [:pointer, :pointer, :uint32, :string], :int
 
+    attach_function :hegel_start_span, [:pointer, :pointer, :uint64], :int
+    attach_function :hegel_stop_span, [:pointer, :pointer, :bool], :int
+    attach_function :hegel_label_from_name, [:pointer, :string, :pointer], :int
+    attach_function :hegel_label_combine, [:pointer, :pointer, :size_t, :pointer], :int
+    attach_function :hegel_new_collection, [:pointer, :pointer, :uint64, :uint64, :pointer], :int
+    attach_function :hegel_collection_more, [:pointer, :pointer, :pointer, :pointer], :int
+    attach_function :hegel_collection_free, [:pointer, :pointer], :int
+
     attach_function :hegel_run_result_free, [:pointer, :pointer], :int
     attach_function :hegel_run_result_status, [:pointer, :pointer, :pointer], :int
+    attach_function :hegel_run_result_error, [:pointer, :pointer, :pointer], :int
     attach_function :hegel_run_result_failure_count, [:pointer, :pointer, :pointer], :int
     attach_function :hegel_run_result_failure, [:pointer, :pointer, :size_t, :pointer], :int
 

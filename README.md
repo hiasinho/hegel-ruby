@@ -4,12 +4,12 @@ A Ruby frontend for the [Hegel](https://hegel.dev/) property-based testing engin
 
 ## Project status
 
-Checkpoint 1 of the experimental Ruby spike is complete. It is a Linux amd64 feasibility demo under `spike/`, not a released gem or public API.
+Both checkpoints of the experimental Ruby spike are complete. They are Linux amd64 feasibility demos under `spike/`, not a released gem or public API.
 
-Run the pinned integer-shrinking demo after following the [Checkpoint 1 setup](docs/ruby-spike-findings.md#setup-and-run).
+Follow the [spike setup and demonstrations](docs/ruby-spike-findings.md) to run integer shrinking, the broken-sort failure and fresh-process replay, and the corrected passing property.
 
 ## Project documentation
 
 - [Upstream Hegel research and Ruby-relevant findings](docs/hegel-research.md)
 - [First Ruby frontend spike plan](docs/ruby-spike-plan.md)
-- [Checkpoint 1 setup, result, and findings](docs/ruby-spike-findings.md)
+- [Ruby spike setup, results, and findings](docs/ruby-spike-findings.md)
