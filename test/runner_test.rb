@@ -36,6 +36,21 @@ class RunnerTest < Minitest::Test
     refute_empty report.blob
   end
 
+  def test_shrinks_varied_arrays_to_a_minimal_duplicate
+    arrays = Hegel.arrays(Hegel.integers(min: -10, max: 10), min_size: 0, max_size: 20)
+    report = nil
+
+    assert_raises(RuntimeError) do
+      Hegel.check(max_examples: 100, seed: 1234, on_failure: ->(failure) { report = failure }) do |test_case|
+        values = test_case.draw(arrays)
+        raise "sort lost values" unless values.sort.uniq == values.sort
+      end
+    end
+
+    assert_equal [ [ 0, 0 ] ], report.drawn_values
+    refute_empty report.blob
+  end
+
   def test_replays_a_saved_failure_through_the_same_property
     generator = Hegel.integers(min: 5, max: 5)
     report = nil
@@ -62,6 +77,47 @@ class RunnerTest < Minitest::Test
     assert_equal "not below five", replayed.message
     assert_equal report.origin, replay.origin
     assert_equal [ 5 ], replay.drawn_values
+  end
+
+  def test_replay_rejects_a_property_that_now_passes
+    generator = Hegel.integers(min: 5, max: 5)
+    report = discover_integer_failure(generator)
+
+    error = assert_raises(Hegel::ReproductionMismatch) do
+      Hegel.replay(blob: report.blob, expected_origin: report.origin, seed: 1234) do |test_case|
+        test_case.draw(generator)
+      end
+    end
+
+    assert_equal "reproduction passed instead of failing", error.message
+  end
+
+  def test_replay_rejects_a_changed_failure_origin
+    generator = Hegel.integers(min: 5, max: 5)
+    report = discover_integer_failure(generator)
+
+    error = assert_raises(Hegel::ReproductionMismatch) do
+      Hegel.replay(blob: report.blob, expected_origin: report.origin, seed: 1234) do |test_case|
+        fail_from_another_origin(test_case, generator)
+      end
+    end
+
+    assert_match(/reproduction origin changed/, error.message)
+  end
+
+  def test_replay_rejects_an_overrun
+    generator = Hegel.integers(min: 5, max: 5)
+    report = discover_integer_failure(generator)
+
+    error = assert_raises(Hegel::ReproductionMismatch) do
+      Hegel.replay(blob: report.blob, expected_origin: report.origin, seed: 1234) do |test_case|
+        test_case.draw(generator)
+        test_case.draw(generator)
+        raise "unreachable failure"
+      end
+    end
+
+    assert_equal "reproduction overran while drawing values", error.message
   end
 
   def test_does_not_classify_interrupt_as_a_property_failure
@@ -129,7 +185,22 @@ class RunnerTest < Minitest::Test
   end
 
   private
+    def discover_integer_failure(generator)
+      report = nil
+      assert_raises(RuntimeError) do
+        Hegel.check(max_examples: 5, seed: 1234, on_failure: ->(failure) { report = failure }) do |test_case|
+          assert_below_five(test_case, generator)
+        end
+      end
+      report
+    end
+
     def assert_below_five(test_case, generator)
       raise "not below five" unless test_case.draw(generator) < 5
+    end
+
+    def fail_from_another_origin(test_case, generator)
+      test_case.draw(generator)
+      raise "failure moved"
     end
 end
