@@ -5,27 +5,24 @@ require "hegel"
 
 module Hegel
   module Minitest
-    DEFAULT_MAX_EXAMPLES = 100
-    DEFAULT_SEED = 0
+    DEFAULT_TEST_CASES = 100
 
     attr_reader :hegel_failure
 
-    def hegel(max_examples: DEFAULT_MAX_EXAMPLES, seed: DEFAULT_SEED, on_failure: nil, &property)
+    def hegel(test_cases: DEFAULT_TEST_CASES, seed: nil, &property)
       @hegel_failure = nil
       report_failure = lambda do |failure|
         @hegel_failure = failure
         print_hegel_failure(failure)
-        on_failure&.call(failure)
       end
 
-      Hegel.check(
-        max_examples:,
+      Runner.new(
+        test_cases:,
         seed:,
         on_failure: report_failure,
         failure_exceptions: [ StandardError, ::Minitest::Assertion ],
-        propagate_exceptions: [ ::Minitest::Skip ],
-        &property
-      )
+        propagate_exceptions: [ ::Minitest::Skip ]
+      ).test(&property)
     end
 
     private

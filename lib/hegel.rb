@@ -9,23 +9,15 @@ require_relative "hegel/runner"
 module Hegel
   module_function
 
-  def integers(min:, max:)
-    IntegerGenerator.new(min:, max:)
+  def integers(min_value: nil, max_value: nil)
+    IntegerGenerator.new(min_value:, max_value:)
   end
 
-  def arrays(elements, min_size:, max_size:)
+  def arrays(elements, min_size: 0, max_size: nil)
     ArrayGenerator.new(elements, min_size:, max_size:)
   end
 
-  def check(max_examples: 100, seed: nil, on_failure: nil, failure_exceptions: StandardError,
-    propagate_exceptions: [], native: Native, &property)
-    Runner.new(max_examples:, seed:, on_failure:, failure_exceptions:, propagate_exceptions:, native:).check(&property)
-  end
-
-  def replay(blob:, expected_origin:, max_examples: 100, seed: nil, on_failure: nil,
-    failure_exceptions: StandardError, propagate_exceptions: [], native: Native, &property)
-    Runner.new(max_examples:, seed:, on_failure:, failure_exceptions:, propagate_exceptions:, native:).replay(
-      blob:, expected_origin:, &property
-    )
+  def test(test_cases: 100, seed: nil, reproduce_failure: nil, on_failure: nil, &property)
+    Runner.new(test_cases:, seed:, on_failure:).test(reproduce_failure:, &property)
   end
 end

@@ -47,11 +47,11 @@ require "minitest/autorun"
 class SortTest < Minitest::Test
   include Hegel::Minitest
 
-  INTEGERS = Hegel.integers(min: -10, max: 10)
+  INTEGERS = Hegel.integers(min_value: -10, max_value: 10)
   ARRAYS = Hegel.arrays(INTEGERS, min_size: 0, max_size: 20)
 
   def test_sort_preserves_values
-    hegel(max_examples: 100, seed: 1234) do |test_case|
+    hegel(test_cases: 100, seed: 1234) do |test_case|
       values = test_case.draw(ARRAYS)
 
       assert_equal values.sort, broken_sort(values)
@@ -119,18 +119,29 @@ Read [`examples/minitest/broken_interval_merger_test.rb`](examples/minitest/brok
 
 ## Core API
 
-Without Minitest, `Hegel.check` treats ordinary `StandardError` exceptions as property failures:
+Without Minitest, `Hegel.test` treats ordinary `StandardError` exceptions as property failures:
 
 ```ruby
-numbers = Hegel.integers(min: 0, max: 100)
+numbers = Hegel.integers(min_value: 0, max_value: 100)
 
-Hegel.check(max_examples: 100, seed: 1234) do |test_case|
+Hegel.test(test_cases: 100, seed: 1234) do |test_case|
   number = test_case.draw(numbers)
   raise "too large" unless number < 5
 end
 ```
 
-A final failure is replayed before it is reported and re-raised. `Interrupt`, `SystemExit`, native errors, replay mismatches, and unconfigured `Exception` subclasses are never mistaken for property failures.
+`test_cases:` defaults to `100` for both `Hegel.test` and Minitest's `hegel` helper. Omitting `seed:` leaves it unset so the engine's active profile chooses the seed: development runs use fresh randomness, while profiles such as `ci` may derandomize. The examples set a seed to keep their output reproducible. Integer bounds may be omitted, and `Hegel.arrays(elements)` defaults to `min_size: 0` with no maximum size. The optional `on_failure:` callback receives the final `Hegel::FailureReport`, including its drawn values, origin, engine version, and reproduction blob.
+
+A final failure is reproduced before it is reported and re-raised. To run a reported failure directly, pass its opaque blob as `reproduce_failure:`:
+
+```ruby
+Hegel.test(reproduce_failure: blob) do |test_case|
+  number = test_case.draw(numbers)
+  raise "too large" unless number < 5
+end
+```
+
+Reproduction blobs are tied to the `libhegel` version that created them. `Interrupt`, `SystemExit`, native errors, reproduction mismatches, and unconfigured `Exception` subclasses are never mistaken for property failures.
 
 ## Development
 

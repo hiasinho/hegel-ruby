@@ -59,24 +59,26 @@ A deliberate divergence requires all of the following:
 
 ## Current public API alignment
 
-The project is unpublished, so the existing experimental surface can still be
-corrected without a compatibility alias. The following changes are the current
-alignment plan:
+The project is unpublished, so its experimental surface was corrected without
+compatibility aliases. The implemented public API is aligned as follows:
 
-| Concern | Current surface | Upstream-compatible target | Status |
-| --- | --- | --- | --- |
-| Property entry point | `Hegel.check` | `Hegel.test` | Planned |
-| Case budget | `max_examples:` | `test_cases:` | Planned |
-| Integer bounds | `integers(min:, max:)` | `integers(min_value: nil, max_value: nil)` | Planned |
-| Array bounds | Both bounds required | `arrays(elements, min_size: 0, max_size: nil)` | Planned |
-| Reproduction | `Hegel.replay(blob:, expected_origin:)` | `Hegel.test(reproduce_failure: blob)` | Planned |
-| Default seed | Core unset; Minitest uses `0` | Unset and nondeterministic | Planned |
-| Adapter controls | Public keywords on `Hegel.check` | Internal runner/adapter seams | Planned |
-| Assumptions and observations | Not implemented | Reserve `assume`, `reject`, `note`, `target`, `event`, and `event_value` | Reserved |
+| Concern | Public surface | Status |
+| --- | --- | --- |
+| Property entry point | `Hegel.test(test_cases:, seed:, reproduce_failure:, on_failure:)` | Implemented |
+| Case budget | `test_cases:` (default `100`) | Implemented |
+| Integer bounds | `integers(min_value: nil, max_value: nil)` | Implemented |
+| Array bounds | `arrays(elements, min_size: 0, max_size: nil)` | Implemented |
+| Reproduction | `Hegel.test(reproduce_failure: blob)` | Implemented |
+| Default seed | Unset in the core API and Minitest adapter; the active engine profile chooses random or derandomized behavior | Implemented |
+| Minitest adapter | `hegel(test_cases: 100, seed: nil)` | Implemented |
+| Adapter controls | Internal runner/adapter seams only | Implemented |
+| Assumptions and observations | Reserve `assume`, `reject`, `note`, `target`, `event`, and `event_value` | Reserved |
 
-Until these planned changes land, the README documents the API that actually
-runs. Contract tests for the target behavior should be added before changing
-that implementation and its examples.
+The README and examples document this implemented surface. Contract tests pin
+its names, defaults, validation, and behavior. `on_failure:` is a Ruby-specific
+reporting hook: it exposes the final `FailureReport` while this minimal frontend
+has no general upstream-style report renderer. It does not change generation or
+failure semantics, and the Minitest adapter consumes the same hook internally.
 
 Missing generators and settings are omissions, not divergences. Add them only
 when their upstream behavior and the relevant native lifecycle are understood

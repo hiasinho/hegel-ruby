@@ -33,8 +33,10 @@ class LifecycleTest < Minitest::Test
   def test_an_interrupted_case_releases_every_owned_root_handle
     native = NativeRecorder.new
 
+    runner = build_runner(native, test_cases: 10)
+
     assert_raises(Interrupt) do
-      Hegel.check(max_examples: 10, seed: 1234, native:) { raise Interrupt, "stop now" }
+      runner.test { raise Interrupt, "stop now" }
     end
 
     assert_equal 0, native.calls[:hegel_mark_complete]
@@ -47,11 +49,13 @@ class LifecycleTest < Minitest::Test
   def test_an_overrun_closes_nested_spans_and_the_collection
     native = NativeRecorder.new
     native.stop_next_generate!
-    integers = Hegel.integers(min: 0, max: 0)
+    integers = Hegel.integers(min_value: 0, max_value: 0)
     arrays = Hegel.arrays(integers, min_size: 1, max_size: 1)
 
+    runner = build_runner(native, test_cases: 10)
+
     assert_raises(Hegel::Native::Error) do
-      Hegel.check(max_examples: 10, seed: 1234, native:) { |test_case| test_case.draw(arrays) }
+      runner.test { |test_case| test_case.draw(arrays) }
     end
 
     assert_operator native.calls[:hegel_new_collection], :>=, 1
@@ -61,10 +65,10 @@ class LifecycleTest < Minitest::Test
 
   def test_reentrant_runner_use_does_not_free_the_outer_run_twice
     native = NativeRecorder.new
-    runner = Hegel::Runner.new(max_examples: 1, seed: 1234, native:)
+    runner = build_runner(native, test_cases: 1)
 
     error = assert_raises(Hegel::Error) do
-      runner.check { runner.check {} }
+      runner.test { runner.test {} }
     end
 
     assert_equal "runner instances can only be used once", error.message
@@ -73,4 +77,49 @@ class LifecycleTest < Minitest::Test
     assert_equal 1, native.calls[:hegel_settings_free]
     assert_equal 1, native.calls[:hegel_context_free]
   end
+
+  def test_direct_reproduction_uses_the_blob_run_and_releases_its_handles
+    generator = Hegel.integers(min_value: 5, max_value: 5)
+    discovered = nil
+    assert_raises(RuntimeError) do
+      Hegel.test(test_cases: 1, seed: 1234, on_failure: ->(failure) { discovered = failure }) do |test_case|
+        raise "not below five" unless test_case.draw(generator) < 5
+      end
+    end
+
+    native = NativeRecorder.new
+    runner = Hegel::Runner.new(
+      test_cases: 1,
+      seed: 1234,
+      native:,
+      failure_exceptions: StandardError,
+      propagate_exceptions: []
+    )
+
+    assert_raises(RuntimeError) do
+      runner.test(reproduce_failure: discovered.blob) do |test_case|
+        raise "not below five" unless test_case.draw(generator) < 5
+      end
+    end
+
+    assert_equal 0, native.calls[:hegel_run_start]
+    assert_equal 1, native.calls[:hegel_run_start_blob]
+    assert_equal 1, native.calls[:hegel_test_case_free]
+    assert_equal 1, native.calls[:hegel_run_result_free]
+    assert_equal 1, native.calls[:hegel_failure_free]
+    assert_equal 1, native.calls[:hegel_run_free]
+    assert_equal 1, native.calls[:hegel_settings_free]
+    assert_equal 1, native.calls[:hegel_context_free]
+  end
+
+  private
+    def build_runner(native, test_cases:)
+      Hegel::Runner.new(
+        test_cases:,
+        seed: 1234,
+        native:,
+        failure_exceptions: StandardError,
+        propagate_exceptions: []
+      )
+    end
 end

@@ -46,6 +46,7 @@ module Hegel
     attach_function :hegel_settings_set_seed, [:pointer, :pointer, :uint64, :bool], :int
 
     attach_function :hegel_run_start, [:pointer, :pointer, :pointer, :pointer, :pointer], :int
+    attach_function :hegel_run_start_blob, [:pointer, :pointer, :string, :pointer, :pointer, :pointer], :int
     attach_function :hegel_next_test_case, [:pointer, :pointer, :pointer], :int
     attach_function :hegel_run_result, [:pointer, :pointer, :pointer], :int
     attach_function :hegel_run_free, [:pointer, :pointer], :int

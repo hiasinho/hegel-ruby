@@ -7,7 +7,7 @@ require_relative "native/resources"
 require_relative "test_case"
 
 module Hegel
-  class CheckResult
+  class TestResult
     attr_reader :engine_version
 
     def initialize(engine_version:)
@@ -40,12 +40,12 @@ module Hegel
 
     Outcome = Data.define(:status, :drawn_values, :error, :origin)
 
-    def initialize(max_examples: 100, seed: nil, on_failure: nil, failure_exceptions: StandardError,
+    def initialize(test_cases: 100, seed: nil, on_failure: nil, failure_exceptions: StandardError,
       propagate_exceptions: [], native: Native)
-      validate_max_examples(max_examples)
+      validate_test_cases(test_cases)
       validate_seed(seed)
 
-      @max_examples = max_examples
+      @test_cases = test_cases
       @seed = seed
       @on_failure = on_failure
       @failure_exceptions = normalize_exception_classes(:failure_exceptions, failure_exceptions)
@@ -61,39 +61,18 @@ module Hegel
       @resources = Native::Resources.new(adapter: @native, context: @context)
     end
 
-    def check(&property)
+    def test(reproduce_failure: nil, &property)
       claimed = claim!
+      validate_reproduce_failure(reproduce_failure)
       raise ArgumentError, "a property block is required" unless property
 
       verify_version!
       settings = build_settings
-      run = start_run(settings)
-      drive(run, &property)
-      result = run_result(run)
-
-      case result_status(result)
-      when Native::HEGEL_RUN_STATUS_PASSED
-        CheckResult.new(engine_version: engine_version)
-      when Native::HEGEL_RUN_STATUS_FAILED
-        replay_failure(settings, failure_from(result), &property)
-      when Native::HEGEL_RUN_STATUS_ERROR
-        raise Native::Error, "property run failed: #{@call.borrowed_string(:hegel_run_result_error, result)}"
+      if reproduce_failure
+        reproduce(settings, reproduce_failure, &property)
       else
-        raise Native::Error, "property run returned an unknown status"
+        explore(settings, &property)
       end
-    ensure
-      cleanup if claimed
-    end
-
-    def replay(blob:, expected_origin:, &property)
-      claimed = claim!
-      raise ArgumentError, "blob must be a non-empty String" unless blob.is_a?(String) && !blob.empty?
-      raise ArgumentError, "expected_origin must be a non-empty String" unless expected_origin.is_a?(String) && !expected_origin.empty?
-      raise ArgumentError, "a property block is required" unless property
-
-      verify_version!
-      settings = build_settings
-      replay_failure(settings, { blob:, origin: expected_origin }, &property)
     ensure
       cleanup if claimed
     end
@@ -105,13 +84,66 @@ module Hegel
         @used = true
       end
 
-      def validate_max_examples(value)
+      def explore(settings, &property)
+        run = start_run(settings)
+        drive(run, &property)
+        result = run_result(run)
+
+        case result_status(result)
+        when Native::HEGEL_RUN_STATUS_PASSED
+          TestResult.new(engine_version: engine_version)
+        when Native::HEGEL_RUN_STATUS_FAILED
+          replay_failure(settings, failure_from(result), &property)
+        when Native::HEGEL_RUN_STATUS_ERROR
+          raise Native::Error, "property run failed: #{@call.borrowed_string(:hegel_run_result_error, result)}"
+        else
+          raise Native::Error, "property run returned an unknown status"
+        end
+      end
+
+      def reproduce(settings, blob, &property)
+        run = start_run(settings, blob:)
+        outcomes = drive(run, collect_outcomes: true, &property)
+        result = run_result(run)
+
+        case result_status(result)
+        when Native::HEGEL_RUN_STATUS_PASSED
+          if outcomes.any? && outcomes.all? { |outcome| outcome.status == :overrun }
+            raise ReproductionMismatch, "reproduction overran while drawing values"
+          end
+
+          raise ReproductionMismatch, "reproduction passed instead of failing"
+        when Native::HEGEL_RUN_STATUS_FAILED
+          failure = failure_from(result, blob:)
+          outcome = outcomes.reverse_each.find do |candidate|
+            candidate.status == :failed && candidate.origin == failure.fetch(:origin)
+          end
+          unless outcome
+            raise ReproductionMismatch, "reproduction failed without a matching Ruby failure"
+          end
+
+          report_failure(failure, outcome)
+        when Native::HEGEL_RUN_STATUS_ERROR
+          raise Native::Error, "reproduction run failed: #{@call.borrowed_string(:hegel_run_result_error, result)}"
+        else
+          raise Native::Error, "reproduction run returned an unknown status"
+        end
+      end
+
+      def validate_test_cases(value)
         unless value.is_a?(Integer) && value.positive?
-          raise ArgumentError, "max_examples must be a positive Integer"
+          raise ArgumentError, "test_cases must be a positive Integer"
         end
         if value > UNSIGNED_64_BIT_MAX
-          raise ArgumentError, "max_examples is outside libhegel's unsigned 64-bit range"
+          raise ArgumentError, "test_cases is outside libhegel's unsigned 64-bit range"
         end
+      end
+
+      def validate_reproduce_failure(value)
+        return if value.nil?
+        return if value.is_a?(String) && !value.empty?
+
+        raise ArgumentError, "reproduce_failure must be nil or a non-empty String"
       end
 
       def validate_seed(value)
@@ -142,28 +174,33 @@ module Hegel
 
       def build_settings
         settings = own(@call.owned_handle(:hegel_settings_new), free: :hegel_settings_free)
-        @call.call(:hegel_settings_set_test_cases, settings, @max_examples)
+        @call.call(:hegel_settings_set_test_cases, settings, @test_cases)
         @call.call(:hegel_settings_set_database, settings, "")
         @call.call(:hegel_settings_set_report_multiple_failures, settings, false)
         @call.call(:hegel_settings_set_seed, settings, @seed || 0, !@seed.nil?)
         settings
       end
 
-      def start_run(settings)
+      def start_run(settings, blob: nil)
         output = FFI::MemoryPointer.new(:pointer)
-        @call.call(:hegel_run_start, settings, nil, nil, output)
-        own(@call.non_null(output.read_pointer, :hegel_run_start), free: :hegel_run_free)
+        operation = blob ? :hegel_run_start_blob : :hegel_run_start
+        arguments = blob ? [ settings, blob, nil, nil, output ] : [ settings, nil, nil, output ]
+        @call.call(operation, *arguments)
+        own(@call.non_null(output.read_pointer, operation), free: :hegel_run_free)
       end
 
-      def drive(run, &property)
+      def drive(run, collect_outcomes: false, &property)
+        outcomes = collect_outcomes ? [] : nil
         loop do
           output = FFI::MemoryPointer.new(:pointer)
           @call.call(:hegel_next_test_case, run, output)
           handle = output.read_pointer
           break if handle.null?
 
-          execute_and_free(handle, &property)
+          outcome = execute_and_free(handle, &property)
+          outcomes << outcome if outcomes
         end
+        outcomes
       end
 
       def execute_and_free(handle, &property)
@@ -216,17 +253,17 @@ module Hegel
         output.read_int
       end
 
-      def failure_from(result)
+      def failure_from(result, blob: nil)
         count_output = FFI::MemoryPointer.new(:size_t)
         @call.call(:hegel_run_result_failure_count, result, count_output)
         count = count_output.read_ulong
         raise Native::Error, "expected one failure, got #{count}" unless count == 1
 
         failure = own(@call.owned_handle(:hegel_run_result_failure, result, 0), free: :hegel_failure_free)
-        blob = @call.borrowed_string(:hegel_failure_reproduction_blob, failure)
-        raise Native::Error, "failure did not include a reproduction blob" unless blob
+        reproduction_blob = blob || @call.borrowed_string(:hegel_failure_reproduction_blob, failure)
+        raise Native::Error, "failure did not include a reproduction blob" unless reproduction_blob
 
-        { blob:, origin: @call.borrowed_string(:hegel_failure_origin, failure) }
+        { blob: reproduction_blob, origin: @call.borrowed_string(:hegel_failure_origin, failure) }
       end
 
       def replay_failure(settings, failure)
@@ -248,6 +285,10 @@ module Hegel
             "reproduction origin changed from #{expected_origin.inspect} to #{outcome.origin.inspect}"
         end
 
+        report_failure(failure, outcome)
+      end
+
+      def report_failure(failure, outcome)
         report = FailureReport.new(
           blob: failure.fetch(:blob),
           drawn_values: outcome.drawn_values,

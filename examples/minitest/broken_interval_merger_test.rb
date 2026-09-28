@@ -7,10 +7,10 @@ require_relative "../broken_interval_merger"
 class BrokenIntervalMergerTest < Minitest::Test
   include Hegel::Minitest
 
-  TIMES = Hegel.arrays(Hegel.integers(min: 0, max: 23), min_size: 0, max_size: 12)
+  TIMES = Hegel.arrays(Hegel.integers(min_value: 0, max_value: 23), min_size: 0, max_size: 12)
 
   def test_merging_preserves_occupied_time
-    hegel(max_examples: 200, seed: 1234) do |test_case|
+    hegel(test_cases: 200, seed: 1234) do |test_case|
       intervals = intervals_from(test_case.draw(TIMES))
       merged = BrokenIntervalMerger.merge(intervals)
 

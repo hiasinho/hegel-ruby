@@ -17,11 +17,11 @@ class MinitestIntegrationTest < Minitest::Test
 
   def test_shrinks_and_reraises_minitest_assertions
     host = PropertyHost.new
-    arrays = Hegel.arrays(Hegel.integers(min: 0, max: 0), min_size: 2, max_size: 2)
+    arrays = Hegel.arrays(Hegel.integers(min_value: 0, max_value: 0), min_size: 2, max_size: 2)
 
     _out, error_output = capture_io do
       error = assert_raises(::Minitest::Assertion) do
-        host.hegel(max_examples: 10, seed: 1234) do |test_case|
+        host.hegel(test_cases: 10, seed: 1234) do |test_case|
           values = test_case.draw(arrays)
           host.assert_equal values.sort, values.sort.uniq
         end
@@ -42,7 +42,7 @@ class MinitestIntegrationTest < Minitest::Test
 
     _out, error_output = capture_io do
       assert_raises(::Minitest::Skip) do
-        host.hegel(max_examples: 10, seed: 1234) do
+        host.hegel(test_cases: 10, seed: 1234) do
           host.skip "not supported here"
         end
       end
@@ -54,18 +54,17 @@ class MinitestIntegrationTest < Minitest::Test
 
   def test_still_shrinks_standard_errors
     host = PropertyHost.new
-    report = nil
 
     error = assert_raises(RuntimeError) do
       capture_io do
-        host.hegel(max_examples: 5, seed: 1234, on_failure: ->(failure) { report = failure }) do |test_case|
-          value = test_case.draw(Hegel.integers(min: 1, max: 1))
+        host.hegel(test_cases: 5, seed: 1234) do |test_case|
+          value = test_case.draw(Hegel.integers(min_value: 1, max_value: 1))
           raise "ordinary failure" if value == 1
         end
       end
     end
 
     assert_equal "ordinary failure", error.message
-    assert_equal [ 1 ], report.drawn_values
+    assert_equal [ 1 ], host.hegel_failure.drawn_values
   end
 end

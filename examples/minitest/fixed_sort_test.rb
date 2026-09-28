@@ -6,11 +6,11 @@ require "minitest/autorun"
 class FixedSortTest < Minitest::Test
   include Hegel::Minitest
 
-  INTEGERS = Hegel.integers(min: -10, max: 10)
+  INTEGERS = Hegel.integers(min_value: -10, max_value: 10)
   ARRAYS = Hegel.arrays(INTEGERS, min_size: 0, max_size: 20)
 
   def test_sort_preserves_values
-    hegel(max_examples: 100, seed: 1234) do |test_case|
+    hegel(test_cases: 100, seed: 1234) do |test_case|
       values = test_case.draw(ARRAYS)
 
       assert_equal values.sort, fixed_sort(values)

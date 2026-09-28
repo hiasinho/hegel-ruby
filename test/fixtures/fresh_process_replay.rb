@@ -4,7 +4,7 @@ require "json"
 require "hegel"
 
 MODE, PAYLOAD_PATH = ARGV
-GENERATOR = Hegel.integers(min: 0, max: 100)
+GENERATOR = Hegel.integers(min_value: 0, max_value: 100)
 PROPERTY_INVOCATIONS = []
 
 def property(test_case)
@@ -18,16 +18,13 @@ report = nil
 begin
   case MODE
   when "discover"
-    Hegel.check(max_examples: 100, seed: 1234, on_failure: ->(failure) { report = failure }) do |test_case|
+    Hegel.test(test_cases: 100, seed: 1234, on_failure: ->(failure) { report = failure }) do |test_case|
       property(test_case)
     end
   when "replay"
     saved = JSON.parse(File.read(PAYLOAD_PATH))
-    Hegel.replay(
-      blob: saved.fetch("blob"),
-      expected_origin: saved.fetch("origin"),
-      max_examples: 100,
-      seed: 1234,
+    Hegel.test(
+      reproduce_failure: saved.fetch("blob"),
       on_failure: ->(failure) { report = failure }
     ) do |test_case|
       property(test_case)

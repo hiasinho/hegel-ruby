@@ -9,28 +9,43 @@ module Hegel
   class IntegerGenerator
     LABEL_NAME = "hegel-ruby.integers"
 
-    attr_reader :min, :max
+    attr_reader :min_value, :max_value
 
-    def initialize(min:, max:)
-      raise ArgumentError, "min must be an Integer" unless min.is_a?(Integer)
-      raise ArgumentError, "max must be an Integer" unless max.is_a?(Integer)
-      raise ArgumentError, "min is outside libhegel's signed 64-bit range" unless SIGNED_64_BIT_RANGE.cover?(min)
-      raise ArgumentError, "max is outside libhegel's signed 64-bit range" unless SIGNED_64_BIT_RANGE.cover?(max)
-      raise ArgumentError, "max must be greater than or equal to min" if max < min
+    def initialize(min_value:, max_value:)
+      validate_bound(:min_value, min_value)
+      validate_bound(:max_value, max_value)
+      if min_value && max_value && max_value < min_value
+        raise ArgumentError, "max_value must be greater than or equal to min_value"
+      end
 
-      @min = min
-      @max = max
+      @min_value = min_value
+      @max_value = max_value
     end
 
     def draw(test_case)
       output = FFI::MemoryPointer.new(:int64)
-      test_case.call_native(:hegel_generate_integer, min, max, output)
+      test_case.call_native(
+        :hegel_generate_integer,
+        min_value || SIGNED_64_BIT_RANGE.begin,
+        max_value || SIGNED_64_BIT_RANGE.end,
+        output
+      )
       output.read_int64
     end
 
     def label(test_case)
       test_case.label_from_name(LABEL_NAME)
     end
+
+    private
+      def validate_bound(name, value)
+        return if value.nil?
+
+        raise ArgumentError, "#{name} must be an Integer or nil" unless value.is_a?(Integer)
+        unless SIGNED_64_BIT_RANGE.cover?(value)
+          raise ArgumentError, "#{name} is outside libhegel's signed 64-bit range"
+        end
+      end
   end
 
   class ArrayGenerator
@@ -41,8 +56,10 @@ module Hegel
     def initialize(elements, min_size:, max_size:)
       raise ArgumentError, "elements must be a generator" unless elements.respond_to?(:draw) && elements.respond_to?(:label)
       validate_size(:min_size, min_size)
-      validate_size(:max_size, max_size)
-      raise ArgumentError, "max_size must be greater than or equal to min_size" if max_size < min_size
+      validate_size(:max_size, max_size, allow_nil: true)
+      if max_size && max_size < min_size
+        raise ArgumentError, "max_size must be greater than or equal to min_size"
+      end
 
       @elements = elements
       @min_size = min_size
@@ -50,7 +67,7 @@ module Hegel
     end
 
     def draw(test_case)
-      collection = test_case.new_collection(min_size, max_size)
+      collection = test_case.new_collection(min_size, max_size || UNSIGNED_64_BIT_MAX)
       values = []
 
       begin
@@ -67,9 +84,12 @@ module Hegel
     end
 
     private
-      def validate_size(name, value)
+      def validate_size(name, value, allow_nil: false)
+        return if allow_nil && value.nil?
+
         unless value.is_a?(Integer) && value >= 0
-          raise ArgumentError, "#{name} must be a non-negative Integer"
+          suffix = allow_nil ? " or nil" : ""
+          raise ArgumentError, "#{name} must be a non-negative Integer#{suffix}"
         end
         raise ArgumentError, "#{name} is outside libhegel's unsigned 64-bit range" if value > UNSIGNED_64_BIT_MAX
       end
