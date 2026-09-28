@@ -1,3 +1,7 @@
 /spike/.bundle/
 /spike/tmp/
 /spike/vendor/
+
+/.bundle/
+/vendor/
+/pkg/

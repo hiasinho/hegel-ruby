@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+ruby -rbundler/setup -w -Itest -e 'Dir["test/**/*_test.rb"].sort.each { |file| require_relative file }'
