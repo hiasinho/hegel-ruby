@@ -106,6 +106,10 @@ module Hegel
         outcomes = drive(run, collect_outcomes: true, &property)
         result = run_result(run)
 
+        if outcomes.any? && outcomes.all? { |outcome| outcome.status == :invalid }
+          raise ReproductionMismatch, "reproduction was rejected by an assumption"
+        end
+
         case result_status(result)
         when Native::HEGEL_RUN_STATUS_PASSED
           if outcomes.any? && outcomes.all? { |outcome| outcome.status == :overrun }
@@ -216,6 +220,9 @@ module Hegel
         yield test_case
         @call.call(:hegel_mark_complete, native_handle(test_case), Native::HEGEL_STATUS_VALID, nil)
         Outcome.new(status: :passed, drawn_values: test_case.drawn_values, error: nil, origin: nil)
+      rescue Control::Rejected
+        @call.call(:hegel_mark_complete, native_handle(test_case), Native::HEGEL_STATUS_INVALID, nil)
+        Outcome.new(status: :invalid, drawn_values: test_case.drawn_values, error: nil, origin: nil)
       rescue Native::StopTest
         @call.call(:hegel_mark_complete, native_handle(test_case), Native::HEGEL_STATUS_OVERRUN, nil)
         Outcome.new(status: :overrun, drawn_values: test_case.drawn_values, error: nil, origin: nil)
@@ -275,6 +282,8 @@ module Hegel
         case outcome.status
         when :passed
           raise ReproductionMismatch, "reproduction passed instead of failing"
+        when :invalid
+          raise ReproductionMismatch, "reproduction was rejected by an assumption"
         when :overrun
           raise ReproductionMismatch, "reproduction overran while drawing values"
         end

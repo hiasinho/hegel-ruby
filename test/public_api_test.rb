@@ -65,6 +65,42 @@ class PublicApiTest < Minitest::Test
       Hegel.method(:arrays).parameters
   end
 
+  def test_assumption_methods_have_the_upstream_contract
+    assert_equal [ [ :req, :condition ] ], Hegel::TestCase.instance_method(:assume).parameters
+    assert_empty Hegel::TestCase.instance_method(:reject).parameters
+  end
+
+  def test_assume_uses_ruby_truthiness_and_reject_never_returns
+    test_case = Hegel::TestCase.new(call: nil, resources: nil, handle: Object.new)
+
+    assert_nil test_case.assume(true)
+    assert_nil test_case.assume(0)
+    assert_nil test_case.assume("")
+
+    [ false, nil ].each do |condition|
+      error = assert_raises(Exception) { test_case.assume(condition) }
+      assert_equal Exception, error.class.superclass
+      refute_kind_of StandardError, error
+    end
+
+    assert_raises(Exception) { test_case.reject }
+  end
+
+  def test_rejection_control_flow_is_not_caught_by_an_ordinary_rescue
+    test_case = Hegel::TestCase.new(call: nil, resources: nil, handle: Object.new)
+    rescued = false
+
+    assert_raises(Exception) do
+      begin
+        test_case.reject
+      rescue StandardError
+        rescued = true
+        raise
+      end
+    end
+    refute rescued
+  end
+
   def test_minitest_adapter_defaults_test_cases_and_only_accepts_seed
     assert_equal [ [ :key, :test_cases ], [ :key, :seed ], [ :block, :property ] ],
       Hegel::Minitest.instance_method(:hegel).parameters

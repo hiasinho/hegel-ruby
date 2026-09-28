@@ -12,7 +12,7 @@
 
 `hegel-ruby` is a property-based testing frontend for Ruby. Ruby runs the property and constructs Ruby values; the native [`libhegel`](https://hegel.dev/reference/libhegel) engine chooses examples, searches for failures, shrinks them, and creates reproduction blobs.
 
-This repository is currently pinned to `libhegel` 0.44.0 and provides bounded integers, arrays, a core runner with verified failure replay, and Minitest integration.
+This repository is currently pinned to `libhegel` 0.44.0 and provides bounded integers, arrays, assumptions, a core runner with verified failure replay, and Minitest integration.
 
 ## Installation
 
@@ -132,6 +132,20 @@ end
 
 `test_cases:` defaults to `100` for both `Hegel.test` and Minitest's `hegel` helper. Omitting `seed:` leaves it unset so the engine's active profile chooses the seed: development runs use fresh randomness, while profiles such as `ci` may derandomize. The examples set a seed to keep their output reproducible. Integer bounds may be omitted, and `Hegel.arrays(elements)` defaults to `min_size: 0` with no maximum size. The optional `on_failure:` callback receives the final `Hegel::FailureReport`, including its drawn values, origin, engine version, and reproduction blob.
 
+Use `assume` for preconditions that cannot be expressed directly by a generator:
+
+```ruby
+Hegel.test do |test_case|
+  numerator = test_case.draw(Hegel.integers(min_value: -100, max_value: 100))
+  denominator = test_case.draw(Hegel.integers(min_value: -100, max_value: 100))
+  test_case.assume(denominator != 0)
+
+  raise "division was not finite" unless numerator.fdiv(denominator).finite?
+end
+```
+
+`test_case.reject` rejects unconditionally and is equivalent to `test_case.assume(false)`. Assumptions use normal Ruby truthiness: only `false` and `nil` reject. Rejected inputs do not count toward `test_cases:`, but rejecting too many inputs produces an engine health error. Prefer generator bounds for simple range constraints because they generate useful inputs directly instead of discarding them.
+
 A final failure is reproduced before it is reported and re-raised. To run a reported failure directly, pass its opaque blob as `reproduce_failure:`:
 
 ```ruby
@@ -182,4 +196,4 @@ For the feasibility evidence behind this implementation, see [`docs/ruby-spike-f
 
 ## Current scope
 
-This project does not yet promise native-library packaging, platforms beyond Linux x86-64, more generator types, assumptions, example-database persistence, callbacks, concurrency, framework integrations beyond Minitest, or a stable public API. It is an experiment intended to establish what a useful Ruby frontend for Hegel could look like—not an official or production-ready Hegel distribution.
+This project does not yet promise native-library packaging, platforms beyond Linux x86-64, more generator types, example-database persistence, callbacks, concurrency, framework integrations beyond Minitest, or a stable public API. It is an experiment intended to establish what a useful Ruby frontend for Hegel could look like—not an official or production-ready Hegel distribution.

@@ -3,23 +3,46 @@
 require_relative "test_helper"
 
 class LifecycleTest < Minitest::Test
+  class RejectOnceGenerator
+    def initialize(generator)
+      @generator = generator
+      @rejected = false
+    end
+
+    def label(test_case)
+      @generator.label(test_case)
+    end
+
+    def draw(test_case)
+      value = @generator.draw(test_case)
+      unless @rejected
+        @rejected = true
+        test_case.reject
+      end
+      value
+    end
+  end
+
   class NativeRecorder
-    attr_reader :calls
+    attr_reader :calls, :completions
 
     def initialize
       @calls = Hash.new(0)
-      @stop_next_generate = false
+      @completions = []
+      @next_generate_result = nil
     end
 
     def stop_next_generate!
-      @stop_next_generate = true
+      @next_generate_result = Hegel::Native::HEGEL_E_STOP_TEST
     end
 
     def method_missing(name, *arguments, &block)
       calls[name] += 1
-      if name == :hegel_generate_integer && @stop_next_generate
-        @stop_next_generate = false
-        return Hegel::Native::HEGEL_E_STOP_TEST
+      completions << arguments.drop(2) if name == :hegel_mark_complete
+      if name == :hegel_generate_integer && @next_generate_result
+        result = @next_generate_result
+        @next_generate_result = nil
+        return result
       end
 
       Hegel::Native.public_send(name, *arguments, &block)
@@ -59,6 +82,22 @@ class LifecycleTest < Minitest::Test
     end
 
     assert_operator native.calls[:hegel_new_collection], :>=, 1
+    assert_equal native.calls[:hegel_new_collection], native.calls[:hegel_collection_free]
+    assert_equal native.calls[:hegel_start_span], native.calls[:hegel_stop_span]
+  end
+
+  def test_an_assumption_rejection_marks_the_case_invalid_and_cleans_nested_resources
+    native = NativeRecorder.new
+    integers = Hegel.integers(min_value: 0, max_value: 0)
+    arrays = Hegel.arrays(RejectOnceGenerator.new(integers), min_size: 1, max_size: 1)
+    runner = build_runner(native, test_cases: 1)
+
+    result = runner.test { |test_case| test_case.draw(arrays) }
+
+    assert result.passed?
+    assert_includes native.completions, [ Hegel::Native::HEGEL_STATUS_INVALID, nil ]
+    assert_equal [ Hegel::Native::HEGEL_STATUS_VALID, nil ], native.completions.last
+    assert_operator native.calls[:hegel_new_collection], :>=, 2
     assert_equal native.calls[:hegel_new_collection], native.calls[:hegel_collection_free]
     assert_equal native.calls[:hegel_start_span], native.calls[:hegel_stop_span]
   end

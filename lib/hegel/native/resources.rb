@@ -26,6 +26,7 @@ module Hegel
         result = @adapter.public_send(operation, @context, *arguments)
         return if result == HEGEL_OK
         return if result == HEGEL_E_STOP_TEST && active_error.is_a?(StopTest)
+        return if result == HEGEL_E_ASSUME && active_error.is_a?(Control::Rejected)
 
         detail = @adapter.hegel_context_last_error(@context)
         message = "#{operation} failed (#{result}): #{detail}"

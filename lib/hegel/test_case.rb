@@ -26,6 +26,16 @@ module Hegel
       value
     end
 
+    def assume(condition)
+      ensure_active!
+      reject unless condition
+    end
+
+    def reject
+      ensure_active!
+      raise Control::Rejected, "assumption rejected"
+    end
+
     def draw_nested(generator)
       ensure_active!
       with_span(generator.label(self)) { generator.draw(self) }

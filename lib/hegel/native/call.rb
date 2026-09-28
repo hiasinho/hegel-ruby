@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "../errors"
 require_relative "../native"
 
 module Hegel
@@ -17,6 +18,7 @@ module Hegel
       def check!(operation, result)
         return if result == HEGEL_OK
         raise StopTest, "#{operation} stopped this test case" if result == HEGEL_E_STOP_TEST
+        raise Control::Rejected, "#{operation} rejected this test case" if result == HEGEL_E_ASSUME
 
         detail = @adapter.hegel_context_last_error(@context)
         raise Error, "#{operation} failed (#{result}): #{detail}"

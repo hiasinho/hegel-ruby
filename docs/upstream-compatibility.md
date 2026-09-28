@@ -72,7 +72,18 @@ compatibility aliases. The implemented public API is aligned as follows:
 | Default seed | Unset in the core API and Minitest adapter; the active engine profile chooses random or derandomized behavior | Implemented |
 | Minitest adapter | `hegel(test_cases: 100, seed: nil)` | Implemented |
 | Adapter controls | Internal runner/adapter seams only | Implemented |
-| Assumptions and observations | Reserve `assume`, `reject`, `note`, `target`, `event`, and `event_value` | Reserved |
+| Assumptions | `test_case.assume(condition)` and `test_case.reject` | Implemented |
+| Observations | Reserve `note`, `target`, `event`, and `event_value` | Reserved |
+
+Upstream frontends type `assume` conditions as booleans. Ruby has no boolean
+parameter type and its conditionals conventionally treat only `false` and `nil`
+as false, so `TestCase#assume` deliberately follows normal Ruby truthiness. Its
+falsey path and `TestCase#reject` use private frontend control flow rather than a
+documented user error; an ordinary `rescue StandardError` cannot turn a rejected
+case into a passing one. This is a Ruby presentation choice over the shared
+upstream semantics: rejected cases are native `INVALID` cases, do not count
+against the valid-case budget, and may still cause engine health or
+unsatisfiable run errors when rejection is excessive.
 
 The README and examples document this implemented surface. Contract tests pin
 its names, defaults, validation, and behavior. `on_failure:` is a Ruby-specific
@@ -140,7 +151,7 @@ never be promised to work across engine versions.
 
 ## Last reviewed upstream references
 
-The initial public API review used:
+The public API review, including the `assume` / `reject` audit, used:
 
 - `hegel-rust` `libhegel-v0.44.0`, commit
   `09c6c0b9aa82f20b4f522ef45b646948f2e793bc`;

@@ -14,15 +14,31 @@ class NativeCallTest < Minitest::Test
     end
   end
 
-  def test_distinguishes_stop_test_control_flow_from_native_errors
+  class AssumeCleanupAdapter
+    def hegel_stop_span(_context, _handle, _discard)
+      Hegel::Native::HEGEL_E_ASSUME
+    end
+
+    def hegel_context_last_error(_context)
+      raise "cleanup should preserve the active rejection without reading an error"
+    end
+  end
+
+  def test_distinguishes_test_control_flow_from_native_errors
     context = Hegel::Native.hegel_context_new
     call = Hegel::Native::Call.new(Hegel::Native, context)
 
     assert_raises(Hegel::Native::StopTest) do
       call.check!(:injected_call, Hegel::Native::HEGEL_E_STOP_TEST)
     end
+    rejected = assert_raises(Exception) do
+      call.check!(:injected_call, Hegel::Native::HEGEL_E_ASSUME)
+    end
+    assert_equal Exception, rejected.class.superclass
+    refute_kind_of StandardError, rejected
+
     assert_raises(Hegel::Native::Error) do
-      call.check!(:injected_call, -2)
+      call.check!(:injected_call, -3)
     end
   ensure
     Hegel::Native.hegel_context_free(context) if context && !context.null?
@@ -35,6 +51,16 @@ class NativeCallTest < Minitest::Test
       rescue StandardError
         flunk "ordinary property rescue caught internal stop-test control flow"
       end
+    end
+  end
+
+  def test_cleanup_preserves_active_assumption_control_flow
+    test_case = Hegel::TestCase.new(call: nil, resources: nil, handle: Object.new)
+    rejection = assert_raises(Exception) { test_case.reject }
+    resources = Hegel::Native::Resources.new(adapter: AssumeCleanupAdapter.new, context: nil)
+
+    assert_silent do
+      resources.cleanup_call(:hegel_stop_span, Object.new, false, active_error: rejection)
     end
   end
 

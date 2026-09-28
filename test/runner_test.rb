@@ -17,6 +17,49 @@ class RunnerTest < Minitest::Test
     assert_equal "0.44.0", result.engine_version
   end
 
+  def test_invalid_cases_do_not_consume_the_valid_case_budget_or_report_failures
+    valid_values = []
+    invocations = 0
+    failure_callback_called = false
+    integers = Hegel.integers(min_value: 0, max_value: 100)
+
+    result = Hegel.test(
+      test_cases: 10,
+      seed: 1234,
+      on_failure: ->(*) { failure_callback_called = true }
+    ) do |test_case|
+      invocations += 1
+      value = test_case.draw(integers)
+      test_case.assume(value.odd?)
+      valid_values << value
+    end
+
+    assert result.passed?
+    assert_equal 10, valid_values.length
+    assert_operator invocations, :>, valid_values.length
+    assert valid_values.all?(&:odd?)
+    refute failure_callback_called
+  end
+
+  def test_reject_is_equivalent_to_assume_false
+    integers = Hegel.integers(min_value: 0, max_value: 100)
+    accepted_with_assume = []
+    accepted_with_reject = []
+
+    Hegel.test(test_cases: 10, seed: 1234) do |test_case|
+      value = test_case.draw(integers)
+      test_case.assume(value.odd?)
+      accepted_with_assume << value
+    end
+    Hegel.test(test_cases: 10, seed: 1234) do |test_case|
+      value = test_case.draw(integers)
+      test_case.reject unless value.odd?
+      accepted_with_reject << value
+    end
+
+    assert_equal accepted_with_assume, accepted_with_reject
+  end
+
   def test_shrinks_replays_and_preserves_a_user_failure
     arrays = Hegel.arrays(Hegel.integers(min_value: 0, max_value: 0), min_size: 2, max_size: 2)
     report = nil
@@ -76,6 +119,25 @@ class RunnerTest < Minitest::Test
     end
 
     assert_equal "reproduction passed instead of failing", error.message
+  end
+
+  def test_direct_reproduction_reports_assumption_rejection_as_a_mismatch
+    generator = Hegel.integers(min_value: 5, max_value: 5)
+    report = discover_integer_failure(generator)
+    failure_callback_called = false
+
+    error = assert_raises(Hegel::ReproductionMismatch) do
+      Hegel.test(
+        reproduce_failure: report.blob,
+        on_failure: ->(*) { failure_callback_called = true }
+      ) do |test_case|
+        test_case.draw(generator)
+        test_case.reject
+      end
+    end
+
+    assert_equal "reproduction was rejected by an assumption", error.message
+    refute failure_callback_called
   end
 
   def test_direct_reproduction_rejects_an_invalid_blob
@@ -150,6 +212,47 @@ class RunnerTest < Minitest::Test
     end
 
     assert_match(/reproduction origin changed/, error.message)
+  end
+
+  def test_discovered_failure_replay_reports_assumption_rejection_as_a_mismatch
+    native = ReplayAwareNative.new
+    generator = Hegel.integers(min_value: 5, max_value: 5)
+    runner = Hegel::Runner.new(
+      test_cases: 5,
+      seed: 1234,
+      native:,
+      failure_exceptions: StandardError,
+      propagate_exceptions: []
+    )
+
+    error = assert_raises(Hegel::ReproductionMismatch) do
+      runner.test do |test_case|
+        test_case.draw(generator)
+        native.replaying? ? test_case.reject : raise("not below five")
+      end
+    end
+
+    assert_equal "reproduction was rejected by an assumption", error.message
+  end
+
+  def test_unsatisfiable_assumptions_remain_engine_run_errors
+    error = assert_raises(Hegel::Native::Error) do
+      Hegel.test(test_cases: 1, seed: 1234) { |test_case| test_case.reject }
+    end
+
+    assert_match(/property run failed: Unsatisfiable/, error.message)
+  end
+
+  def test_excessive_assumption_rejection_remains_an_engine_health_error
+    integers = Hegel.integers(min_value: 0, max_value: 100)
+
+    error = assert_raises(Hegel::Native::Error) do
+      Hegel.test(test_cases: 5, seed: 1234) do |test_case|
+        test_case.assume(test_case.draw(integers) > 100)
+      end
+    end
+
+    assert_match(/property run failed: FailedHealthCheck: FilterTooMuch/, error.message)
   end
 
   def test_does_not_classify_frontend_errors_as_property_failures
