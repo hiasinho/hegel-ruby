@@ -54,7 +54,7 @@ Read these files in order:
 6. [`lib/hegel/native.rb`](lib/hegel/native.rb) — the small pinned C ABI surface.
 7. [`test/`](test) — lifecycle, replay, generator, and Minitest integration behavior.
 
-For the original feasibility work and its boundaries, see [`docs/ruby-spike-findings.md`](docs/ruby-spike-findings.md). The throwaway implementation remains isolated under `spike/`. Background is in [`docs/hegel-research.md`](docs/hegel-research.md), and the original checkpoint plan is in [`docs/ruby-spike-plan.md`](docs/ruby-spike-plan.md).
+For the feasibility evidence behind this implementation, see [`docs/ruby-spike-findings.md`](docs/ruby-spike-findings.md). Architectural background is in [`docs/hegel-research.md`](docs/hegel-research.md). The superseded throwaway code and execution plan remain available in Git history.
 
 ## Core API
 

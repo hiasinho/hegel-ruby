@@ -1,6 +1,0 @@
-source "https://rubygems.org"
-
-ruby "3.4.10"
-
-gem "ffi", "1.17.4"
-gem "minitest", "5.27.0"

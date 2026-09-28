@@ -1,6 +1,6 @@
 # Ruby spike findings
 
-Both planned checkpoints are complete: Ruby drives the integer example, then a small explicit-draw frontend generates and shrinks integer arrays, replays the final failure, and passes after the property is corrected. Everything remains experimental and isolated under `spike/`.
+Both planned checkpoints were completed: Ruby drove the integer example, then a small explicit-draw frontend generated and shrank integer arrays, replayed the final failure, and passed after the property was corrected. The superseded throwaway implementation has since been removed; it remains available in Git history. This document preserves the evidence that informed the current frontend.
 
 ## Pinned environment
 
@@ -20,7 +20,7 @@ The binding was checked against the release's `hegel.h` and its `hegel-c/example
 | `hegel.h` | `https://github.com/hegeldev/hegel-rust/releases/download/libhegel-v0.44.0/hegel.h` | `a324eca375a51f0b46b41db6017c6d4f000324c3a6d3ee2563a17a11df4a6944` |
 | `libhegel-linux-amd64.so` | `https://github.com/hegeldev/hegel-rust/releases/download/libhegel-v0.44.0/libhegel-linux-amd64.so` | `c2baf69815c3cb7ebbcc690f6d721e21056ce278651d26e9e8c5ba795e2ce48c` |
 
-Those values match the `.sha256` sidecars and digests published on the upstream release. `spike/script/fetch-libhegel` embeds them, downloads to the ignored `spike/vendor/libhegel-v0.44.0/` directory, and refuses non-Linux or non-amd64 hosts. Runtime code never downloads native files. `HEGEL_LIBRARY_PATH` can select another copy of the shared library, whose reported version must still be 0.44.0.
+Those values match the `.sha256` sidecars and digests published on the upstream release. The spike's `script/fetch-libhegel` embedded them, downloaded into its ignored `vendor/libhegel-v0.44.0/` directory, and refused non-Linux or non-amd64 hosts. Runtime code did not download native files. `HEGEL_LIBRARY_PATH` could select another copy of the shared library, whose reported version still had to be 0.44.0.
 
 ## Reference frontend
 
