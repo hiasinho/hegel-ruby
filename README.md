@@ -42,6 +42,35 @@ end
 
 When the assertion fails, Hegel keeps rerunning the block while it shrinks the generated choices. The integration prints the final Ruby values, stable assertion origin, engine version, and reproduction blob, then re-raises the replayed `Minitest::Assertion` so Minitest reports the failure normally.
 
+## A realistic interval-merging example
+
+The interval example models a scheduling system that consolidates overlapping busy periods. It checks three properties: merging preserves occupied time, produces ordered non-overlapping periods, and is idempotent.
+
+First run the deliberately broken implementation:
+
+```sh
+ruby "$(ruby -e 'print Gem.user_dir')/bin/bundle" exec \
+  ruby -Ilib examples/minitest/broken_interval_merger_test.rb
+```
+
+Hegel finds that shortening an existing period to the end of a nested period loses occupied time, then shrinks the input to:
+
+```text
+Drawn values: [[0, 1, 0, 0]]
+Expected merging [[0, 2], [0, 1]] to preserve occupied time.
+Expected: [0, 1]
+  Actual: [0]
+```
+
+The integers are paired and normalized into nonempty half-open intervals. Run the corrected implementation with:
+
+```sh
+ruby "$(ruby -e 'print Gem.user_dir')/bin/bundle" exec \
+  ruby -Ilib examples/minitest/interval_merger_test.rb
+```
+
+Read [`examples/minitest/broken_interval_merger_test.rb`](examples/minitest/broken_interval_merger_test.rb) for the property, then compare [`examples/broken_interval_merger.rb`](examples/broken_interval_merger.rb) with [`examples/interval_merger.rb`](examples/interval_merger.rb) to see the one-line correction.
+
 ## A short code tour
 
 Read these files in order:
